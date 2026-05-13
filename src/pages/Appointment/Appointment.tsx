@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import AdditionalInfoSection from "@/components/appointment/AdditionalInfoSection";
 import AppointmentBreadcrumb from "@/components/appointment/AppointmentBreadcrumb";
@@ -18,10 +18,11 @@ import { useMyPatient } from "@/hooks/use-profile";
 import type { Doctor } from "@/types/doctor";
 
 function Appointment() {
+  const [searchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
   const state = location.state as any;
-  const doctorId = state?.doctorId as string | undefined;
+  const doctorId = (state?.doctorId as string | undefined) || searchParams.get('doctorId') || undefined;
 
   const doctorQuery = usePublicDoctorDetail(doctorId);
   const myPatientQuery = useMyPatient();
@@ -42,8 +43,14 @@ function Appointment() {
     if (!doctorId) {
       toast.error("Vui lòng chọn bác sĩ trước khi đặt lịch.");
       navigate("/doctor", { replace: true });
+      return;
     }
-  }, [doctorId, navigate]);
+
+    if (!doctorQuery.isLoading && !doctorQuery.data) {
+      toast.error("Không tìm thấy thông tin bác sĩ.");
+      navigate("/doctor", { replace: true });
+    }
+  }, [doctorId, navigate, doctorQuery.isLoading, doctorQuery.data]);
 
 
   const handleChangeAppointmentType = (value: "all" | "online" | "offline") => {
