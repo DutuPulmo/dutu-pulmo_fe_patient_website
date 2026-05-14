@@ -48,7 +48,7 @@ function AppointmentCard({ appointment }: AppointmentCardProps) {
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-amber-500 text-base">payments</span>
             <p className="text-xs font-semibold text-amber-700">
-              Lịch khám chưa được thanh toán
+              Lịch khám chưa thanh toán (Hết hạn sau 24h)
             </p>
           </div>
           <button

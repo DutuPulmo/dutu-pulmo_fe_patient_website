@@ -87,6 +87,16 @@ function AppointmentSuccess() {
         <PaymentMethodList />
 
         <PaymentSecurityNotice />
+        
+        <div className="mt-8 p-4 bg-amber-50 border border-amber-200 rounded-xl flex gap-3 items-start">
+          <span className="material-icons text-amber-500 mt-0.5">timer</span>
+          <div>
+            <h4 className="font-bold text-amber-900 text-sm">Lưu ý giữ chỗ</h4>
+            <p className="text-amber-800 text-sm mt-1 leading-relaxed">
+              Bạn vui lòng hoàn tất thanh toán trong vòng **24 giờ** kể từ khi đặt. Sau thời gian này, hệ thống sẽ tự động hủy lịch để nhường chỗ cho bệnh nhân khác.
+            </p>
+          </div>
+        </div>
 
         <button
           type="button"
