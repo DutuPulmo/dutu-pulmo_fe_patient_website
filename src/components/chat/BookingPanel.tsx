@@ -103,7 +103,7 @@ export const BookingPanel: React.FC<BookingPanelProps> = ({
 
   const [step, setStep] = useState<Step>("select");
   const [visitType, setVisitType] = useState<"VIDEO" | "IN_PERSON">(bookingData.type ?? "VIDEO");
-  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState<string>(bookingData.date || "");
   const [selectedSlot, setSelectedSlot] = useState<TimeSlotResponse | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -130,6 +130,31 @@ export const BookingPanel: React.FC<BookingPanelProps> = ({
        return types.includes("IN_CLINIC");
     });
   }, [slotsQuery.data, visitType]);
+
+  React.useEffect(() => {
+    if (bookingData.slot && displayedSlots.length > 0 && !selectedSlot) {
+      const matched = displayedSlots.find(s => {
+        const startTime = formatVietnamTime(s.startTime);
+        const aiTime = bookingData.slot!.trim();
+        
+        const normalize = (t: string) => (t.length === 4 ? "0" + t : t);
+        const isMatch = normalize(startTime) === normalize(aiTime);
+        return isMatch;
+      });
+      if (matched) {
+        setSelectedSlot(matched);
+      } else {
+        console.warn("[BookingPanel] No matching slot found for AI time:", bookingData.slot);
+      }
+    }
+  }, [displayedSlots, bookingData.slot, selectedSlot]);
+
+  // Auto-advance to confirm step if everything is pre-filled
+  React.useEffect(() => {
+    if (selectedDate && selectedSlot && step === "select" && bookingData.date && bookingData.slot) {
+      setStep("confirm");
+    }
+  }, [selectedDate, selectedSlot, step, bookingData.date, bookingData.slot]);
 
   const handleConfirm = async () => {
     setStep("submitting");
