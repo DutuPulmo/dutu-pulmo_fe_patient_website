@@ -54,7 +54,7 @@ function formatVietnamTime(dateString: string) {
 
 // ─── DoctorInfo ───────────────────────────────────────────────────────────────
 function DoctorInfo({ data, doctorInfo }: { data: BookingData, doctorInfo?: any }) {
-  const name = doctorInfo?.user?.fullName || data.doctorName || "Bác sĩ chuyên khoa";
+  const name = doctorInfo?.fullName || data.doctorName || "Bác sĩ chuyên khoa";
   const spec = doctorInfo?.specialty || data.doctorSpecialty || "Hô hấp – Phổi";
   const hosp = doctorInfo?.primaryHospital?.name || data.hospitalName || "";
   const rating = doctorInfo?.averageRating || data.doctorRating;
@@ -102,6 +102,7 @@ export const BookingPanel: React.FC<BookingPanelProps> = ({
   }, []);
 
   const [step, setStep] = useState<Step>("select");
+  const hasAutoAdvanced = React.useRef(false);
   const [visitType, setVisitType] = useState<"VIDEO" | "IN_PERSON">(bookingData.type ?? "VIDEO");
   const [selectedDate, setSelectedDate] = useState<string>(bookingData.date || "");
   const [selectedSlot, setSelectedSlot] = useState<TimeSlotResponse | null>(null);
@@ -112,7 +113,7 @@ export const BookingPanel: React.FC<BookingPanelProps> = ({
   // API Hooks
   const doctorQuery = usePublicDoctorDetail(bookingData.doctorId);
   const doctorInfo = doctorQuery.data;
-  
+  console.log("Doctor Info:", doctorInfo);
   const myPatientQuery = useMyPatient();
   const createAppointmentMutation = useCreateAppointment();
 
@@ -134,12 +135,22 @@ export const BookingPanel: React.FC<BookingPanelProps> = ({
   React.useEffect(() => {
     if (bookingData.slot && displayedSlots.length > 0 && !selectedSlot) {
       const matched = displayedSlots.find(s => {
-        const startTime = formatVietnamTime(s.startTime);
-        const aiTime = bookingData.slot!.trim();
+        const start = new Date(s.startTime);
+        const end = new Date(s.endTime);
+        const startTimeStr = formatVietnamTime(s.startTime); // "08:00"
+        const aiTimeStr = bookingData.slot!.trim(); // "08:15"
         
         const normalize = (t: string) => (t.length === 4 ? "0" + t : t);
-        const isMatch = normalize(startTime) === normalize(aiTime);
-        return isMatch;
+        if (normalize(startTimeStr) === normalize(aiTimeStr)) return true;
+
+        const [h, m] = aiTimeStr.split(':').map(Number);
+        if (isNaN(h) || isNaN(m)) return false;
+        
+        const aiMinutes = h * 60 + m;
+        const startMinutes = start.getHours() * 60 + start.getMinutes();
+        const endMinutes = end.getHours() * 60 + end.getMinutes();
+
+        return aiMinutes >= startMinutes && aiMinutes < endMinutes;
       });
       if (matched) {
         setSelectedSlot(matched);
@@ -149,10 +160,10 @@ export const BookingPanel: React.FC<BookingPanelProps> = ({
     }
   }, [displayedSlots, bookingData.slot, selectedSlot]);
 
-  // Auto-advance to confirm step if everything is pre-filled
   React.useEffect(() => {
-    if (selectedDate && selectedSlot && step === "select" && bookingData.date && bookingData.slot) {
+    if (selectedDate && selectedSlot && step === "select" && bookingData.date && bookingData.slot && !hasAutoAdvanced.current) {
       setStep("confirm");
+      hasAutoAdvanced.current = true;
     }
   }, [selectedDate, selectedSlot, step, bookingData.date, bookingData.slot]);
 
@@ -180,6 +191,13 @@ export const BookingPanel: React.FC<BookingPanelProps> = ({
 
       const slotDisplay = `${formatVietnamTime(selectedSlot.startTime)} - ${formatVietnamTime(selectedSlot.endTime)}`;
       
+      console.log("[BookingPanel] Booking confirmed:", {
+        doctorId: bookingData.doctorId,
+        doctorName: doctorInfo?.fullName ?? bookingData.doctorName ?? "Bác sĩ",
+        selectedDate,
+        selectedSlot: slotDisplay,
+        visitType,
+      });
       const detail: ConfirmDetail = {
         doctorId: bookingData.doctorId,
         doctorName: doctorInfo?.fullName ?? bookingData.doctorName ?? "Bác sĩ",

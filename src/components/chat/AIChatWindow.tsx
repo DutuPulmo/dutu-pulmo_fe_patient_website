@@ -246,23 +246,34 @@ export const AIChatWindow: React.FC<AIChatWindowProps> = ({
                     )}
                     style={{ lineHeight: "1.75", wordBreak: "break-word" }}
                   >
-                    {isLatestAi && !bookingData ? (
-                      <TypingEffect text={item.content} />
-                    ) : (
-                      <ReactMarkdown
-                        components={{
-                          p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
-                          ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-2" {...props} />,
-                          ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-2" {...props} />,
-                          li: ({node, ...props}) => <li className="mb-1" {...props} />,
-                          strong: ({node, ...props}) => <strong className="font-semibold text-current" {...props} />,
-                          em: ({node, ...props}) => <em className="italic" {...props} />,
-                          a: ({node, ...props}) => <a className="text-blue-500 hover:underline" {...props} />,
-                        }}
-                      >
-                        {item.content}
-                      </ReactMarkdown>
-                    )}
+                    {(() => {
+                      const cleanContent = (text: string) => {
+                        return text
+                          .replace(/(?:^|\n)(?:date|time|type):\s*[^\n]*/gi, "")
+                          .trim();
+                      };
+                      const displayContent = cleanContent(item.content);
+
+                      if (isLatestAi && !bookingData && !item.bookingData) {
+                        return <TypingEffect text={displayContent} />;
+                      }
+                      
+                      return (
+                        <ReactMarkdown
+                          components={{
+                            p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                            ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-2" {...props} />,
+                            ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-2" {...props} />,
+                            li: ({node, ...props}) => <li className="mb-1" {...props} />,
+                            strong: ({node, ...props}) => <strong className="font-semibold text-current" {...props} />,
+                            em: ({node, ...props}) => <em className="italic" {...props} />,
+                            a: ({node, ...props}) => <a className="text-blue-500 hover:underline" {...props} />,
+                          }}
+                        >
+                          {displayContent}
+                        </ReactMarkdown>
+                      );
+                    })()}
                   </div>
 
                   {isAi && item.bookingData && (
