@@ -7,7 +7,7 @@ export const AIChatBubble: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-4">
+    <div className="fixed sm:bottom-6 sm:right-6 bottom-4 right-4 z-50 flex flex-col items-end gap-2 sm:gap-4">
       {/* Chat Window */}
       {isOpen && (
         <div className="animate-in slide-in-from-bottom-5 fade-in duration-300 origin-bottom-right">

@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, RotateCcw, Sparkles, X } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import { Send, Bot, User, RotateCcw, Sparkles, X, CheckCircle2 } from "lucide-react";
 import { useAIChatStore, type Message } from "@/store/ai-chat.store";
 import { aiChatBotService } from "@/services/ai-chatbot.service";
 import { TypingEffect } from "./TypingEffect";
 import { TypingIndicator } from "./TypingIndicator";
 import { cn } from "@/lib/utils";
+import { BookingPanel, type BookingData, type ConfirmDetail } from "./BookingPanel";
 
 interface AIChatWindowProps {
   onClose?: () => void;
@@ -24,20 +26,35 @@ export const AIChatWindow: React.FC<AIChatWindowProps> = ({
     setSessionId,
     setLoading,
     clearHistory,
+    updateMessage,
   } = useAIChatStore();
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  const [bookingData, setBookingData] = useState<BookingData | null>(null);
+  const [isBookingMinimized, setIsBookingMinimized] = useState(false);
+  const bookingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, isLoading]);
+  }, [messages, isLoading, bookingData]);
+
+  useEffect(() => {
+    return () => {
+      if (bookingTimerRef.current) {
+        clearTimeout(bookingTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleSend = async (text?: string) => {
     const messageText = text || inputText.trim();
     if (!messageText || isLoading) return;
 
     if (!text) setInputText("");
+
+    if (bookingData) setIsBookingMinimized(true);
 
     const userMsg: Message = {
       id: Date.now().toString(),
@@ -59,20 +76,32 @@ export const AIChatWindow: React.FC<AIChatWindowProps> = ({
           setSessionId(response.meta.sessionId);
         }
 
+        const resData = response.data as any;
         const aiMsg: Message = {
           id: (Date.now() + 1).toString(),
           role: "assistant",
           content: response.data.message ?? "",
           timestamp: response.data.timestamp ?? new Date().toISOString(),
           suggestedActions: response.data.suggestedActions ?? [],
+          bookingData: (resData.action === "OPEN_BOOKING" && resData.bookingData?.doctorId) ? resData.bookingData : undefined,
         };
         addMessage(aiMsg);
+
+        if (
+          resData.action === "OPEN_BOOKING" &&
+          resData.bookingData?.doctorId
+        ) {
+          bookingTimerRef.current = setTimeout(() => {
+            setBookingData(resData.bookingData as BookingData);
+            setIsBookingMinimized(false);
+          }, 800);
+        }
       }
     } catch (error: unknown) {
       console.error("AI Chat Error:", error);
 
-      // Fix: lấy message an toàn, tránh undefined
-      let errorText = "Xin lỗi, có lỗi xảy ra khi kết nối với máy chủ AI. Vui lòng thử lại sau.";
+      let errorText =
+        "Xin lỗi, có lỗi xảy ra khi kết nối với máy chủ AI. Vui lòng thử lại sau.";
       if (error instanceof Error && error.message) {
         errorText = `Xin lỗi, có lỗi xảy ra`;
       }
@@ -89,25 +118,32 @@ export const AIChatWindow: React.FC<AIChatWindowProps> = ({
     }
   };
 
-  // Render text với \n -> <br/>
-  const renderTextWithLineBreaks = (text: string) => {
-    if (!text) return null;
-    return text.split("\n").map((line, i, arr) => (
-      <React.Fragment key={i}>
-        {line}
-        {i < arr.length - 1 && <br />}
-      </React.Fragment>
-    ));
+  const handleBookingConfirm = (messageId: string, _detail: ConfirmDetail, confirmMessage: string) => {
+    // Lưu trạng thái đã đặt vào tin nhắn cũ
+    updateMessage(messageId, { isBookingCompleted: true });
+    
+    // Tắt panel active (nếu có)
+    setBookingData(null);
+    
+    const confirmMsg: Message = {
+      id: Date.now().toString(),
+      role: "assistant",
+      content: confirmMessage,
+      timestamp: new Date().toISOString(),
+      suggestedActions: ["Xem lịch hẹn của tôi", "Chuẩn bị gì trước khi khám?", "Đặt lịch khác"],
+    };
+    addMessage(confirmMsg);
   };
 
+
+
   return (
-    // Fix emoji font: thêm font-family ưu tiên emoji system font
     <div
       className={cn(
         "flex flex-col bg-slate-50 overflow-hidden",
         isFullPage
           ? "h-full w-full"
-          : "h-[500px] w-[380px] rounded-2xl shadow-2xl border border-slate-200",
+          : "h-[600px] max-h-[85vh] w-[400px] max-w-[calc(100vw-2rem)] rounded-2xl shadow-2xl border border-slate-200",
       )}
       style={{
         fontFamily:
@@ -152,7 +188,10 @@ export const AIChatWindow: React.FC<AIChatWindowProps> = ({
       {/* Messages */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth hide-scrollbar"
+        className={cn(
+          "overflow-y-auto overflow-x-hidden p-4 space-y-4 scroll-smooth hide-scrollbar transition-all duration-300",
+          "flex-1",
+        )}
       >
         {messages.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center opacity-40 text-center px-6">
@@ -181,11 +220,11 @@ export const AIChatWindow: React.FC<AIChatWindowProps> = ({
             >
               <div
                 className={cn(
-                  "flex gap-2 items-start max-w-[85%]",
+                  "flex gap-2 items-start min-w-0",
+                  isAi && item.bookingData ? "max-w-[95%]" : "max-w-[85%]",
                   !isAi && "flex-row-reverse",
                 )}
               >
-                {/* Avatar */}
                 <div
                   className={cn(
                     "h-8 w-8 rounded-full flex items-center justify-center shrink-0 mt-0.5",
@@ -197,8 +236,7 @@ export const AIChatWindow: React.FC<AIChatWindowProps> = ({
                   {isAi ? <Bot size={16} /> : <User size={16} />}
                 </div>
 
-                <div className="flex flex-col gap-1">
-                  {/* Bubble */}
+                <div className="flex flex-col gap-1 min-w-0">
                   <div
                     className={cn(
                       "px-4 py-2.5 rounded-2xl text-sm",
@@ -208,14 +246,51 @@ export const AIChatWindow: React.FC<AIChatWindowProps> = ({
                     )}
                     style={{ lineHeight: "1.75", wordBreak: "break-word" }}
                   >
-                    {isLatestAi ? (
+                    {isLatestAi && !bookingData ? (
                       <TypingEffect text={item.content} />
                     ) : (
-                      <span>{renderTextWithLineBreaks(item.content)}</span>
+                      <ReactMarkdown
+                        components={{
+                          p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                          ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-2" {...props} />,
+                          ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-2" {...props} />,
+                          li: ({node, ...props}) => <li className="mb-1" {...props} />,
+                          strong: ({node, ...props}) => <strong className="font-semibold text-current" {...props} />,
+                          em: ({node, ...props}) => <em className="italic" {...props} />,
+                          a: ({node, ...props}) => <a className="text-blue-500 hover:underline" {...props} />,
+                        }}
+                      >
+                        {item.content}
+                      </ReactMarkdown>
                     )}
                   </div>
 
-                  {/* Suggested actions */}
+                  {isAi && item.bookingData && (
+                    <div className="mt-3 w-full bg-white rounded-2xl border border-slate-200 shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-500">
+                      {item.isBookingCompleted ? (
+                        <div className="flex flex-col items-center justify-center gap-2 py-6 px-4 bg-green-50/50">
+                          <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center text-green-600">
+                            <CheckCircle2 size={24} />
+                          </div>
+                          <p className="font-bold text-slate-800 text-sm">Lịch khám đã được xác nhận!</p>
+                          <p className="text-[10px] text-slate-500 text-center uppercase tracking-wider font-medium">
+                            Bạn đã hoàn tất đặt lịch cho tin nhắn này
+                          </p>
+                        </div>
+                      ) : (
+                        <BookingPanel
+                          messageId={item.id}
+                          bookingData={item.bookingData}
+                          sessionId={sessionId}
+                          isMinimized={isBookingMinimized}
+                          onToggleMinimize={() => setIsBookingMinimized(!isBookingMinimized)}
+                          onConfirm={(detail, msg) => handleBookingConfirm(item.id, detail, msg)}
+                          onClose={() => {}}
+                        />
+                      )}
+                    </div>
+                  )}
+
                   {isAi &&
                     item.suggestedActions &&
                     item.suggestedActions.length > 0 && (
@@ -240,8 +315,7 @@ export const AIChatWindow: React.FC<AIChatWindowProps> = ({
         {isLoading && <TypingIndicator />}
       </div>
 
-      {/* Input */}
-      <div className="p-4 bg-white border-t border-slate-100">
+      <div className="p-4 bg-white border-t border-slate-100 shrink-0">
         <form
           onSubmit={(e) => {
             e.preventDefault();
