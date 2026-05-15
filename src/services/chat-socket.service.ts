@@ -151,6 +151,11 @@ class ChatSocketService {
   offDisconnect(handler: () => void): void {
     this.socket?.off('disconnect', handler);
   }
+
+  emitStatus(status: 'online' | 'away' | 'busy' | 'offline'): void {
+    if (!this.socket) return;
+    this.socket.emit('update-status', { status });
+  }
 }
 
 export const chatSocketService = new ChatSocketService();

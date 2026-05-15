@@ -9,7 +9,6 @@ import type {
   ChatRoom,
   JoinRoomPayload,
   LocalChatMessage,
-  OnlineUser,
   TypingUser,
 } from '@/types/chat';
 
@@ -97,18 +96,18 @@ function bumpRoomOrder(
   );
 }
 
+import { useChatSocketStore } from '@/store/chat-socket.store';
+
 export function useChat() {
   const queryClient = useQueryClient();
   const authUser = useAuthStore((state) => state.user);
-  const token = useAuthStore((state) => state.accessToken);
   const currentUserId = authUser?.id ?? '';
 
+  const { isConnected: isSocketConnected, onlineUserIds } = useChatSocketStore();
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
-  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [typingUsersByRoom, setTypingUsersByRoom] = useState<
     Record<string, TypingUser[]>
   >({});
-  const [isSocketConnected, setIsSocketConnected] = useState(false);
 
   const joinedRoomRef = useRef<string | null>(null);
 
@@ -135,49 +134,7 @@ export function useChat() {
   });
 
   useEffect(() => {
-    if (!token || !currentUserId) return;
-
-    const socket = chatSocketService.connect(token);
-    setIsSocketConnected(socket.connected);
-
-    const onConnect = () => {
-      setIsSocketConnected(true);
-      chatSocketService.requestOnlineUsers();
-    };
-
-    const onDisconnect = () => {
-      setIsSocketConnected(false);
-    };
-
-    const onOnlineUsers = (users: OnlineUser[]) => {
-      setOnlineUsers(users);
-    };
-
-    const onUserOnline = (payload: {
-      userId: string;
-      fullName: string;
-      timestamp: string;
-    }) => {
-      setOnlineUsers((previous) => {
-        if (previous.some((item) => item.id === payload.userId)) return previous;
-        const nextUser: OnlineUser = {
-          id: payload.userId,
-          fullName: payload.fullName,
-          email: '',
-        };
-        return [...previous, nextUser];
-      });
-    };
-
-    const onUserOffline = (payload: {
-      userId: string;
-      fullName: string;
-      timestamp: string;
-    }) => {
-      setOnlineUsers((previous) =>
-        previous.filter((item) => item.id !== payload.userId),
-      );
-    };
+    if (!isSocketConnected) return;
 
     const onTyping = (payload: { chatroomId: string; users: TypingUser[] }) => {
       setTypingUsersByRoom((previous) => ({
@@ -197,38 +154,20 @@ export function useChat() {
       );
     };
 
-    const onException = (payload: { message?: string }) => {
-      toast.error(payload.message || 'Kết nối chat gặp lỗi.');
-    };
-
     const onJoinedRoom = (_payload: JoinRoomPayload & { message: string }) => {
       // no-op
     };
 
-    chatSocketService.onConnect(onConnect);
-    chatSocketService.onDisconnect(onDisconnect);
-    chatSocketService.onOnlineUsers(onOnlineUsers);
-    chatSocketService.onUserOnline(onUserOnline);
-    chatSocketService.onUserOffline(onUserOffline);
     chatSocketService.onTyping(onTyping);
     chatSocketService.onNewMessage(onNewMessage);
-    chatSocketService.onException(onException);
     chatSocketService.onJoinedRoom(onJoinedRoom);
 
     return () => {
-      chatSocketService.offConnect(onConnect);
-      chatSocketService.offDisconnect(onDisconnect);
-      chatSocketService.offOnlineUsers(onOnlineUsers);
-      chatSocketService.offUserOnline(onUserOnline);
-      chatSocketService.offUserOffline(onUserOffline);
       chatSocketService.offTyping(onTyping);
       chatSocketService.offNewMessage(onNewMessage);
-      chatSocketService.offException(onException);
       chatSocketService.offJoinedRoom(onJoinedRoom);
-      chatSocketService.disconnect();
-      joinedRoomRef.current = null;
     };
-  }, [currentUserId, queryClient, token]);
+  }, [isSocketConnected, queryClient]);
 
   useEffect(() => {
     if (!selectedRoomId || !isSocketConnected) return;
@@ -338,11 +277,6 @@ export function useChat() {
     );
   }, [currentUserId, selectedRoomId, typingUsersByRoom]);
 
-  const onlineUserIds = useMemo(
-    () => new Set(onlineUsers.map((user) => user.id)),
-    [onlineUsers],
-  );
-
   const rooms = roomsQuery.data ?? [];
   const activeRoom = rooms.find((room) => room.id === selectedRoomId) ?? null;
   const localMessages = messagesQuery.data ?? [];
@@ -364,7 +298,6 @@ export function useChat() {
     selectedRoomId,
     setSelectedRoomId,
     messages: localMessages,
-    onlineUsers,
     onlineUserIds,
     typingUsersForActiveRoom,
     isSocketConnected,

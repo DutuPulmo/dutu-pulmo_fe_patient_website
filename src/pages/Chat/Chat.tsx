@@ -116,8 +116,17 @@ export const ChatPage = () => {
   }, [currentUserId, doctorSearchQuery.data]);
 
   useEffect(() => {
-    messageBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, selectedRoomId]);
+    if (isLoadingMessages) return;
+
+    const timer = setTimeout(() => {
+      messageBottomRef.current?.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'nearest' 
+      });
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [messages.length, selectedRoomId, isLoadingMessages]);
 
   useEffect(() => {
     return () => {
@@ -203,13 +212,13 @@ export const ChatPage = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-6 h-screen overflow-hidden">
-      <div className="flex flex-col gap-1">
+    <div className="max-w-7xl mx-auto px-4 py-4 h-[calc(100vh-64px)] overflow-hidden flex flex-col gap-4">
+      <div className="flex flex-col gap-0.5 flex-shrink-0">
         <h1 className="text-2xl font-bold">Tin nhắn trao đổi</h1>
-        <p className="text-slate-500">Trao đổi trực tiếp với bác sĩ chuyên khoa</p>
+        <p className="text-slate-500 text-sm">Trao đổi trực tiếp với bác sĩ chuyên khoa</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[340px_minmax(0,1fr)] flex-1 min-h-0">
         <Card className="h-full flex flex-col overflow-hidden">
           <CardHeader className="space-y-4 p-4 border-b">
             <CardTitle className="text-base font-semibold">Cuộc trò chuyện</CardTitle>
@@ -325,7 +334,7 @@ export const ChatPage = () => {
           </CardContent>
         </Card>
 
-        <Card className="h-[calc(100vh-220px)] min-h-[560px] flex flex-col overflow-hidden">
+        <Card className="h-full flex flex-col overflow-hidden">
           <CardHeader className="border-b px-6 py-4 bg-slate-50/30">
             <div className="flex items-center justify-between gap-4">
               {activeParticipant ? (
